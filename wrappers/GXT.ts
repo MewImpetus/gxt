@@ -1,1 +1,1 @@
-export * from '../build/GXT/tact_GXT';
+export * from '../build/GXT/tact_JettonMasterGXT';
