@@ -1,18 +1,19 @@
-import { Blockchain, printTransactionFees, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { comment, toNano } from '@ton/core';
-import { JettonMasterGXT, loadTakeWalletAddress, loadTep64TokenData } from '../wrappers/GXT';
+import {
+    Blockchain,
+    printTransactionFees,
+    SandboxContract,
+    TreasuryContract
+} from '@ton/sandbox';
 import '@ton/test-utils';
 
-// import { loadTakeWalletAddress, loadTep64TokenData } from "../build/GXT/tact_JettonMasterGXT";
-import { JettonWalletTemplate } from "../build/GXT/tact_JettonWalletTemplate";
+import { JettonMasterGXT, loadTakeWalletAddress, loadTep64TokenData } from '../build/GXT/tact_JettonMasterGXT';
+import { JettonWalletTemplate } from '../build/GXT/tact_JettonWalletTemplate';
 import exp from 'constants';
 
+describe('Jetton', () => {
 
-describe('GXT', () => {
     let blockchain: Blockchain;
-    let deployer: SandboxContract<TreasuryContract>;
-    let gXT: SandboxContract<JettonMasterGXT>;
-
     let admin: SandboxContract<TreasuryContract>;
     let user: SandboxContract<TreasuryContract>;
     let responseDestination: SandboxContract<TreasuryContract>;
@@ -20,43 +21,45 @@ describe('GXT', () => {
     let userJettonWallet: SandboxContract<JettonWalletTemplate>;
     let nJettonOwnerHas: bigint = toNano(Math.random() * 1000);
 
-    beforeEach(async () => {
+    beforeAll(async () => {
         blockchain = await Blockchain.create();
         admin = await blockchain.treasury('admin');
         user = await blockchain.treasury('user');
         deployer = await blockchain.treasury('deployer');
         responseDestination = await blockchain.treasury('responseDestination');
 
-        gXT = blockchain.openContract(await JettonMasterGXT.fromInit(admin.address,
-            {
-                $$type: "Tep64TokenData",
-                flag: BigInt(1),
-                content: "https://raw.githubusercontent.com/MewImpetus/gxt/refs/heads/main/gxt.json",
-            },
-            toNano("210000000000")));
+        jettonMasterContract = blockchain.openContract(
+            await JettonMasterGXT.fromInit(
+                admin.address,
+                {
+                    $$type: "Tep64TokenData",
+                    flag: BigInt(1),
+                    content: "https://github.com/MewImpetus/gxt/blob/main/gxt.json",
+                },
+                toNano("210000000000")
+            )
+        );
 
         adminJettonWallet = blockchain.openContract(
             await JettonWalletTemplate.fromInit(
-                gXT.address,
+                jettonMasterContract.address,
                 admin.address,
             )
         );
 
         userJettonWallet = blockchain.openContract(
             await JettonWalletTemplate.fromInit(
-                gXT.address,
+                jettonMasterContract.address,
                 user.address,
             )
         );
 
-
-        console.log(`jettonMasterContract: ${gXT.address}`);
+        console.log(`jettonMasterContract: ${jettonMasterContract.address}`);
         console.log(`adminJettonWallet: ${adminJettonWallet.address}`);
         console.log(`userJettonWallet: ${userJettonWallet.address}`);
         console.log(`admin: ${admin.address}`);
         console.log(`user: ${user.address}`);
         console.log(`responseDestination: ${responseDestination.address}`);
-        console.log(`nJettonOwnerHas: ${nJettonOwnerHas}`)
     });
 
     it("signature for contracts code", async () => {
@@ -69,45 +72,43 @@ describe('GXT', () => {
         expect(dataHash1.equals(dataHash2)).toBeFalsy();
     });
 
-    it('should deploy', async () => {
-        // the check is done inside beforeEach
-        // blockchain and gXT are ready to use
-        const tx = await gXT.send(
-            deployer.getSender(),
+    it("deploy master contract", async () => {
+        const tx = await jettonMasterContract.send(
+            admin.getSender(),
             {
-                value: toNano('0.05'),
+                value: toNano("1"),
+                bounce: false,
             },
             {
-                $$type: 'Deploy',
-                queryId: 0n,
-            }
+                $$type: "Deploy",
+                queryId: BigInt(Math.floor(Date.now() / 1000)),
+            },
         );
-
+        console.log("deploy master contract");
         printTransactionFees(tx.transactions);
 
         expect(tx.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: gXT.address,
+            from: admin.address,
+            to: jettonMasterContract.address,
             success: true,
             op: 0x946a98b6,
         });
 
-        const staticTax = await gXT.getStaticTax()
+        const staticTax = await jettonMasterContract.getStaticTax()
         expect(staticTax).toEqual(toNano("0.001"));
 
-        const jettonData = await gXT.getGetJettonData();
+        const jettonData = await jettonMasterContract.getGetJettonData();
         expect(jettonData.totalSupply).toEqual(BigInt(0));
         expect(jettonData.mintable).toBeTruthy();
         expect(jettonData.owner.equals(admin.address)).toBeTruthy();
 
         const jettonContent = loadTep64TokenData(jettonData.content.asSlice());
         expect(jettonContent.flag).toEqual(BigInt(1));
-        expect(jettonContent.content).toEqual("https://raw.githubusercontent.com/MewImpetus/gxt/refs/heads/main/gxt.json");
-
+        expect(jettonContent.content).toEqual("https://github.com/MewImpetus/gxt/blob/main/gxt.json");
     });
 
     it("tep-89 includeAddress==true", async () => {
-        const tx = await gXT.send(
+        const tx = await jettonMasterContract.send(
             admin.getSender(),
             {
                 value: toNano("1"),
@@ -125,12 +126,12 @@ describe('GXT', () => {
 
         expect(tx.transactions).toHaveTransaction({
             from: admin.address,
-            to: gXT.address,
+            to: jettonMasterContract.address,
             success: true,
             op: 0x2c76b973,  // ProvideWalletAddress
         });
         expect(tx.transactions).toHaveTransaction({
-            from: gXT.address,
+            from: jettonMasterContract.address,
             to: admin.address,
             success: true,
             op: 0xd1735400,  // TakeWalletAddress
@@ -144,7 +145,7 @@ describe('GXT', () => {
     });
 
     it("tep-89 includeAddress==false", async () => {
-        const tx = await gXT.send(
+        const tx = await jettonMasterContract.send(
             admin.getSender(),
             {
                 value: toNano("1"),
@@ -162,12 +163,12 @@ describe('GXT', () => {
 
         expect(tx.transactions).toHaveTransaction({
             from: admin.address,
-            to: gXT.address,
+            to: jettonMasterContract.address,
             success: true,
             op: 0x2c76b973,  // ProvideWalletAddress
         });
         expect(tx.transactions).toHaveTransaction({
-            from: gXT.address,
+            from: jettonMasterContract.address,
             to: admin.address,
             success: true,
             op: 0xd1735400,  // TakeWalletAddress
@@ -181,7 +182,7 @@ describe('GXT', () => {
     });
 
     it("mint to owner", async () => {
-        const tx = await gXT.send(
+        const tx = await jettonMasterContract.send(
             admin.getSender(),
             {
                 value: toNano("1"),
@@ -202,12 +203,12 @@ describe('GXT', () => {
 
         expect(tx.transactions).toHaveTransaction({
             from: admin.address,
-            to: gXT.address,
+            to: jettonMasterContract.address,
             success: true,
             op: 0xa593886f,  // MintJetton
         });
         expect(tx.transactions).toHaveTransaction({
-            from: gXT.address,
+            from: jettonMasterContract.address,
             to: adminJettonWallet.address,
             success: true,
             op: 0x178d4519,  // TokenTransferInternal
@@ -228,9 +229,8 @@ describe('GXT', () => {
         const jettonData = await adminJettonWallet.getGetWalletData();
         expect(jettonData.owner.equals(admin.address)).toBeTruthy();
         expect(jettonData.balance).toEqual(nJettonOwnerHas);
-        expect(jettonData.master.equals(gXT.address)).toBeTruthy();
+        expect(jettonData.master.equals(jettonMasterContract.address)).toBeTruthy();
     });
-
 
     it("transfer to user", async () => {
         const tx = await adminJettonWallet.send(
@@ -242,10 +242,10 @@ describe('GXT', () => {
             {
                 $$type: "TokenTransfer",
                 queryId: BigInt(Math.floor(Date.now() / 1000)),
-                amount: toNano("10"),
+                amount: nJettonOwnerHas,
                 destination: user.address,
                 responseDestination: responseDestination.address,
-                forwardAmount: toNano("0.01"),
+                forwardAmount: toNano("0.1"),
                 forwardPayload: comment("jetton forward msg"),
                 customPayload: null,
             },
@@ -278,7 +278,7 @@ describe('GXT', () => {
             op: 0xd53276db,  // Excesses
         });
 
-        const jettonMasterData = await gXT.getGetJettonData();
+        const jettonMasterData = await jettonMasterContract.getGetJettonData();
         expect(jettonMasterData.totalSupply).toEqual(nJettonOwnerHas);
 
         const ownerJettonData = await adminJettonWallet.getGetWalletData();
@@ -287,7 +287,7 @@ describe('GXT', () => {
         const jettonData = await userJettonWallet.getGetWalletData();
         expect(jettonData.owner.equals(user.address)).toBeTruthy();
         expect(jettonData.balance).toEqual(nJettonOwnerHas);
-        expect(jettonData.master.equals(gXT.address)).toBeTruthy();
+        expect(jettonData.master.equals(jettonMasterContract.address)).toBeTruthy();
     });
 
     it("user transfer back to admin", async () => {
@@ -300,7 +300,7 @@ describe('GXT', () => {
             {
                 $$type: "TokenTransfer",
                 queryId: BigInt(Math.floor(Date.now() / 1000)),
-                amount: toNano("1"),
+                amount: toNano("10"),
                 destination: admin.address,
                 responseDestination: responseDestination.address,
                 forwardAmount: toNano("0.1"),
@@ -336,7 +336,7 @@ describe('GXT', () => {
             op: 0xd53276db,  // Excesses
         });
 
-        const jettonMasterData = await gXT.getGetJettonData();
+        const jettonMasterData = await jettonMasterContract.getGetJettonData();
         expect(jettonMasterData.totalSupply).toEqual(nJettonOwnerHas);
 
         const ownerJettonData = await adminJettonWallet.getGetWalletData();
@@ -345,6 +345,207 @@ describe('GXT', () => {
         const jettonData = await userJettonWallet.getGetWalletData();
         expect(jettonData.owner.equals(user.address)).toBeTruthy();
         expect(jettonData.balance).toEqual(nJettonOwnerHas - toNano("10"));
-        expect(jettonData.master.equals(gXT.address)).toBeTruthy();
+        expect(jettonData.master.equals(jettonMasterContract.address)).toBeTruthy();
+    });
+
+    it("admin transfer to user with tiny forward ton", async () => {
+        const tx = await adminJettonWallet.send(
+            admin.getSender(),
+            {
+                value: toNano("1"),
+                bounce: false,
+            },
+            {
+                $$type: "TokenTransfer",
+                queryId: BigInt(Math.floor(Date.now() / 1000)),
+                amount: toNano("10"),
+                destination: user.address,
+                responseDestination: responseDestination.address,
+                forwardAmount: BigInt("1"),  // insufficient forward ton
+                forwardPayload: comment("jetton forward msg"),
+                customPayload: null,
+            },
+        );
+        console.log("admin transfer to user with tiny forward ton");
+        printTransactionFees(tx.transactions);
+
+        expect(tx.transactions).toHaveTransaction({
+            from: admin.address,
+            to: adminJettonWallet.address,
+            success: true,
+            op: 0xf8a7ea5,  // TokenTransfer
+        });
+        expect(tx.transactions).toHaveTransaction({
+            from: adminJettonWallet.address,
+            to: userJettonWallet.address,
+            success: true,
+            op: 0x178d4519,  // TokenTransferInternal
+        });
+        expect(tx.transactions).not.toHaveTransaction({
+            from: userJettonWallet.address,
+            to: user.address,
+            success: true,
+            op: 0x7362d09c,  // TransferNotification
+        });
+        expect(tx.transactions).toHaveTransaction({
+            from: userJettonWallet.address,
+            to: responseDestination.address,
+            success: true,
+            op: 0xd53276db,  // Excesses
+        });
+
+        const jettonMasterData = await jettonMasterContract.getGetJettonData();
+        expect(jettonMasterData.totalSupply).toEqual(nJettonOwnerHas);
+
+        const ownerJettonData = await adminJettonWallet.getGetWalletData();
+        expect(ownerJettonData.balance).toEqual(toNano("0"));
+
+        const jettonData = await userJettonWallet.getGetWalletData();
+        expect(jettonData.owner.equals(user.address)).toBeTruthy();
+        expect(jettonData.balance).toEqual(nJettonOwnerHas);
+        expect(jettonData.master.equals(jettonMasterContract.address)).toBeTruthy();
+    });
+
+    it("burn from user", async () => {
+        const tx = await userJettonWallet.send(
+            user.getSender(),
+            {
+                value: toNano("1"),
+                bounce: false,
+            },
+            {
+                $$type: "Burn",
+                queryId: BigInt(Math.floor(Date.now() / 1000)),
+                amount: nJettonOwnerHas,
+                responseDestination: responseDestination.address,
+                customPayload: null,
+            },
+        );
+        console.log("burn from user");
+        printTransactionFees(tx.transactions);
+
+        expect(tx.transactions).toHaveTransaction({
+            from: user.address,
+            to: userJettonWallet.address,
+            success: true,
+            op: 0x595f07bc,  // Burn
+        });
+        expect(tx.transactions).toHaveTransaction({
+            from: userJettonWallet.address,
+            to: jettonMasterContract.address,
+            success: true,
+            op: 0x7bdd97de,  // TokenBurnNotification
+        });
+        expect(tx.transactions).toHaveTransaction({
+            from: jettonMasterContract.address,
+            to: responseDestination.address,
+            success: true,
+            op: 0xd53276db,  // Excesses
+        });
+
+        const jettonMasterData = await jettonMasterContract.getGetJettonData();
+        expect(jettonMasterData.totalSupply).toEqual(BigInt("0"));
+
+        const jettonData = await userJettonWallet.getGetWalletData();
+        expect(jettonData.owner.equals(user.address)).toBeTruthy();
+        expect(jettonData.balance).toEqual(BigInt(0));
+        expect(jettonData.master.equals(jettonMasterContract.address)).toBeTruthy();
+    });
+
+    it("withdraw by unauthorized user", async () => {
+        const balanceBefore = await userJettonWallet.getTonBalance();
+
+        const tx = await userJettonWallet.send(
+            admin.getSender(),
+            {
+                value: toNano("1"),
+                bounce: true,
+            },
+            "withdraw",
+        );
+        console.log("withdraw by unauthorized user");
+        printTransactionFees(tx.transactions);
+
+        expect(tx.transactions).toHaveTransaction({
+            from: admin.address,
+            to: userJettonWallet.address,
+            success: false,
+        });
+
+        const balance = await userJettonWallet.getTonBalance();
+        expect(balance).toEqual(balanceBefore);
+    });
+
+    it("user withdraw", async () => {
+        const tx = await userJettonWallet.send(
+            user.getSender(),
+            {
+                value: toNano("1"),
+                bounce: false,
+            },
+            "withdraw",
+        );
+        console.log("withdraw");
+        printTransactionFees(tx.transactions);
+
+        expect(tx.transactions).toHaveTransaction({
+            from: user.address,
+            to: userJettonWallet.address,
+            success: true,
+        });
+        expect(tx.transactions).toHaveTransaction({
+            from: userJettonWallet.address,
+            to: user.address,
+            success: true,
+            op: 0xd53276db,  // Excesses
+        });
+
+        const balance = await userJettonWallet.getTonBalance();
+        expect(balance).toEqual(toNano("0"));
+    });
+
+
+
+    it("admin mint all", async () => {
+        const tx = await jettonMasterContract.send(
+            admin.getSender(),
+            {
+                value: toNano("1"),
+                bounce: false,
+            },
+            {
+                $$type: "MintAll",
+                targetAddress: admin.address
+            }
+        );
+        console.log("admin mint all");
+        printTransactionFees(tx.transactions);
+
+        expect(tx.transactions).toHaveTransaction({
+            from: admin.address,
+            to: jettonMasterContract.address,
+            success: true,
+            op: 0x888041c3,  // MintAll
+        });
+        expect(tx.transactions).toHaveTransaction({
+            from: jettonMasterContract.address,
+            to: adminJettonWallet.address,
+            success: true,
+            op: 0x178d4519,  // TokenTransferInternal
+        });
+
+        expect(tx.transactions).toHaveTransaction({
+            from: adminJettonWallet.address,
+            to: admin.address,
+            success: true,
+            op: 0xd53276db,  // Excesses
+        });
+
+        const jettonData = await adminJettonWallet.getGetWalletData();
+        expect(jettonData.balance).toEqual(210000000000000000000n);
+
+        const jettonData2 = await jettonMasterContract.getGetJettonData();
+        expect(jettonData2.totalSupply).toEqual(210000000000000000000n);
+        expect(jettonData2.mintable).toBeFalsy();
     });
 });
