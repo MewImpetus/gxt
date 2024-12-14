@@ -16,7 +16,9 @@ describe('Jetton', () => {
     let blockchain: Blockchain;
     let admin: SandboxContract<TreasuryContract>;
     let user: SandboxContract<TreasuryContract>;
+    let deployer: SandboxContract<TreasuryContract>;
     let responseDestination: SandboxContract<TreasuryContract>;
+    let jettonMasterContract: SandboxContract<JettonMasterGXT>;
     let adminJettonWallet: SandboxContract<JettonWalletTemplate>;
     let userJettonWallet: SandboxContract<JettonWalletTemplate>;
     let nJettonOwnerHas: bigint = toNano(Math.random() * 1000);

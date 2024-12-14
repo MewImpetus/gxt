@@ -104,14 +104,14 @@ describe('EscrowGXT', () => {
         // blockchain and escrowGXT are ready to use
 
         // activate
-        // await escrowGXT.send(
-        //     deployer.getSender(),
-        //     {
-        //         value: toNano("1"),
-        //         bounce: false,
-        //     },
-        //     "activate"
-        // )
+        await escrowGXT.send(
+            deployer.getSender(),
+            {
+                value: toNano("1"),
+                bounce: false,
+            },
+            "activate"
+        )
 
         const tx = await jettonMasterContract.send(
             deployer.getSender(),
@@ -218,7 +218,7 @@ describe('EscrowGXT', () => {
 
 
         // 检查是否可以正常取出
-        await escrowGXT.send(
+        const exTx = await escrowGXT.send(
             deployer.getSender(),
             {
                 value: toNano("1"),
@@ -231,6 +231,34 @@ describe('EscrowGXT', () => {
                 to: deployer.address
             }
         )
+
+
+        expect(exTx.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: escrowGXT.address,
+            success: true,
+        });
+        
+        expect(exTx.transactions).toHaveTransaction({
+            from: escrowGXT.address,
+            to: escrowJettonWallet.address,
+            success: true,
+        });
+
+
+        expect(exTx.transactions).toHaveTransaction({
+            from: escrowJettonWallet.address,
+            to: adminJettonWallet.address,
+            success: true,
+        });
+
+        expect(exTx.transactions).toHaveTransaction({
+            from: adminJettonWallet.address,
+            to: deployer.address,
+            success: true,
+        });
+
+       
     });
 
     
