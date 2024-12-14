@@ -9,8 +9,8 @@
 
 ## How to use
 将该项目clone到本地，进入项目根目录
-### 安装依赖
-npm install
+### Install Dependencies
+`npm install`
 
 ### Build
 
@@ -250,7 +250,7 @@ await escrowGXT.send(
     );
 ```
 
-6. 提取释放的代币，通过选择相应的分配额
+6. 提币，通过选择相应的分配额,将指定数量的GTX提到指定钱包
 ```js
     // 比如我们提取 Foundation Treasury  的 10个GTX 到 user 的地址
     await escrowGXT.send(
