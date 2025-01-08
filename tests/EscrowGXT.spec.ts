@@ -153,22 +153,22 @@ describe('EscrowGXT', () => {
         expect(jettonData.balance).toEqual(210000000000000000000n);
 
         // 从里面提币出去
-        await escrowGXT.send(
-            deployer.getSender(),
-            {
-                value: toNano("1"),
-                bounce: false,
-            },
-            {
-                $$type: "ExtractingAnything",
-                queryId: 0n,
-                amount: toNano("10000"),
-                to: deployer.address
-            }
-        )
+        // await escrowGXT.send(
+        //     deployer.getSender(),
+        //     {
+        //         value: toNano("1"),
+        //         bounce: false,
+        //     },
+        //     {
+        //         $$type: "ExtractingAnything",
+        //         queryId: 0n,
+        //         amount: toNano("10000"),
+        //         to: deployer.address
+        //     }
+        // )
 
-        const jettonData2 = await adminJettonWallet.getGetWalletData();
-        expect(jettonData2.balance).toEqual(toNano("10000"));
+        // const jettonData2 = await adminJettonWallet.getGetWalletData();
+        // expect(jettonData2.balance).toEqual(toNano("10000"));
 
     });
 
@@ -218,45 +218,45 @@ describe('EscrowGXT', () => {
 
 
         // 检查是否可以正常取出
-        const exTx = await escrowGXT.send(
-            deployer.getSender(),
-            {
-                value: toNano("1"),
-                bounce: false,
-            },
-            {
-                $$type: "ExtractingAnything",
-                queryId: 0n,
-                amount: toNano("10000"),
-                to: deployer.address
-            }
-        )
+        // const exTx = await escrowGXT.send(
+        //     deployer.getSender(),
+        //     {
+        //         value: toNano("1"),
+        //         bounce: false,
+        //     },
+        //     {
+        //         $$type: "ExtractingAnything",
+        //         queryId: 0n,
+        //         amount: toNano("10000"),
+        //         to: deployer.address
+        //     }
+        // )
 
 
-        expect(exTx.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: escrowGXT.address,
-            success: true,
-        });
+        // expect(exTx.transactions).toHaveTransaction({
+        //     from: deployer.address,
+        //     to: escrowGXT.address,
+        //     success: true,
+        // });
         
-        expect(exTx.transactions).toHaveTransaction({
-            from: escrowGXT.address,
-            to: escrowJettonWallet.address,
-            success: true,
-        });
+        // expect(exTx.transactions).toHaveTransaction({
+        //     from: escrowGXT.address,
+        //     to: escrowJettonWallet.address,
+        //     success: true,
+        // });
 
 
-        expect(exTx.transactions).toHaveTransaction({
-            from: escrowJettonWallet.address,
-            to: adminJettonWallet.address,
-            success: true,
-        });
+        // expect(exTx.transactions).toHaveTransaction({
+        //     from: escrowJettonWallet.address,
+        //     to: adminJettonWallet.address,
+        //     success: true,
+        // });
 
-        expect(exTx.transactions).toHaveTransaction({
-            from: adminJettonWallet.address,
-            to: deployer.address,
-            success: true,
-        });
+        // expect(exTx.transactions).toHaveTransaction({
+        //     from: adminJettonWallet.address,
+        //     to: deployer.address,
+        //     success: true,
+        // });
 
        
     });

@@ -114,7 +114,6 @@ contract EscrowGXT with Deployable {
         require(self.distribution.get(key) != null, "Allocation name does not exist");
 
         let distribution = self.distribution.get(key)!!;
-        let currentTime: Int = now();
         let delta: Int = now() - self.lock_start;
         require(delta > distribution.cliff_duration, "The allocation has not been unlocked");
         require(ctx.sender == self.owner || ctx.sender == distribution.admin, "Not Owner or Admin");

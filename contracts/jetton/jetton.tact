@@ -84,10 +84,6 @@ trait JettonMaster with Common {
         self.receiveMintJetton(msg);
     }
 
-    // this is a non-standard method, it's used to mint new tokens to multiple users.
-    receive(msg: MultiMint) {
-        self.receiveMultiMint(msg);
-    }
 
     // this is a TEP-074 standard receiver method,
     // it's used to update the jetton total supply when burning tokens.
@@ -188,60 +184,6 @@ trait JettonMaster with Common {
             }.toCell(),
             code: jettonWallet.code,
             data: jettonWallet.data
-        });
-    }
-
-    virtual fun receiveMultiMint(msg: MultiMint) {
-        let ctx: Context = context();
-        nativeThrowUnless(codeNotMintable, self.mintable);
-        nativeThrowUnless(codeUnauthorized, ctx.sender == self.owner);
-
-        let totalTonCost: Int = 0;
-        let i: Int = 0;
-        while (i < msg.receiverCount) {
-            let receiver = msg.receivers.get(i);
-            nativeThrowUnless(codeMapIndexNotExists, receiver != null);
-            nativeThrowUnless(codeAmountShouldBePositive, receiver!!.amount > 0);
-            nativeThrowUnless(codeAmountShouldBePositive, receiver!!.tonAmount > 0);
-            nativeThrowUnless(codeReceiverInsufficientReceiverTonAmount,
-                receiver!!.tonAmount > receiver!!.forwardAmount);
-
-            self.totalSupply += receiver!!.amount;
-            totalTonCost += receiver!!.tonAmount;
-
-            let jettonWallet = self.getJettonWalletContract(receiver!!.receiver);
-            send(SendParameters{
-                to: contractAddress(jettonWallet),
-                value: receiver!!.tonAmount,
-                bounce: false,
-                body: TokenTransferInternal{
-                    queryId: msg.queryId,
-                    amount: receiver!!.amount,
-                    from: sender(),
-                    responseDestination: receiver!!.responseDestination,
-                    forwardAmount: receiver!!.forwardAmount,
-                    forwardPayload: receiver!!.forwardPayload,
-                }.toCell(),
-                code: jettonWallet.code,
-                data: jettonWallet.data
-            });
-
-            i = i + 1;
-        }
-
-        nativeThrowUnless(codeInflowValueNotSufficient,
-            ctx.value >= totalTonCost + self.staticTax);
-
-        // refund
-        self.reserveValue(0);
-        send(SendParameters{
-            to: sender(),
-            value: 0,
-            bounce: false,
-            mode: SendRemainingBalance,
-            body: Excesses{
-                queryId: msg.queryId,
-            }.toCell(),
         });
     }
 
